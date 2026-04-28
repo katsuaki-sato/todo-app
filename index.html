@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>タスクリスト</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f3;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+      color: #1a1a18;
+    }
+    #app {
+      background: #fff;
+      border-radius: 12px;
+      border: 0.5px solid #ddd;
+      padding: 2rem;
+      width: 100%;
+      max-width: 520px;
+      height: fit-content;
+    }
+    h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
+    .top-row { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+    #task-input {
+      flex: 1; padding: 8px 12px; font-size: 15px;
+      border: 0.5px solid #ccc; border-radius: 8px;
+      outline: none; font-family: inherit;
+    }
+    #task-input:focus { border-color: #888; }
+    #add-btn {
+      padding: 8px 16px; font-size: 15px;
+      border: 0.5px solid #ccc; border-radius: 8px;
+      background: #fff; cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    #add-btn:hover { background: #f0f0ee; }
+    #add-btn:active { transform: scale(0.98); }
+    .task-card {
+      background: #fff;
+      border: 0.5px solid #e0e0de;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      transition: opacity .15s, box-shadow .15s;
+    }
+    .task-card.dragging { opacity: .4; }
+    .task-card.drag-over { box-shadow: 0 -2px 0 #888; }
+    .task-card.done .task-label { text-decoration: line-through; color: #aaa; }
+    .card-main { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+    .drag-handle {
+      color: #bbb; font-size: 16px; cursor: grab;
+      user-select: none; padding: 0 2px; line-height: 1;
+    }
+    .drag-handle:active { cursor: grabbing; }
+    input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #444; }
+    .task-label { flex: 1; font-size: 15px; cursor: pointer; line-height: 1.5; }
+    .memo-toggle {
+      font-size: 14px; color: #bbb;
+      background: none; border: none; cursor: pointer;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .memo-toggle:hover { background: #f0f0ee; }
+    .memo-toggle.has-memo { color: #666; }
+    .del-btn {
+      font-size: 13px; color: #bbb; background: none; border: none;
+      cursor: pointer; padding: 2px 6px; border-radius: 4px; font-family: inherit;
+    }
+    .del-btn:hover { background: #fdecea; color: #c0392b; }
+    .memo-area { padding: 0 14px 12px 46px; }
+    .memo-input {
+      width: 100%; font-size: 13px; color: #555;
+      background: #f8f8f6; border: 0.5px solid #e0e0de;
+      border-radius: 8px; padding: 6px 10px;
+      resize: none; font-family: inherit; line-height: 1.5; min-height: 56px;
+    }
+    .memo-input:focus { outline: none; border-color: #aaa; }
+    #stats { font-size: 13px; color: #888; margin-top: 1rem; }
+    #clear-btn {
+      margin-top: 0.75rem; font-size: 13px; color: #888;
+      background: none; border: none; cursor: pointer; padding: 0; font-family: inherit;
+    }
+    #clear-btn:hover { color: #333; }
+    .empty { text-align: center; padding: 2rem 0; font-size: 14px; color: #aaa; }
+    #note { font-size: 12px; color: #bbb; margin-top: 1.5rem; }
+    #install-btn {
+      display: none; margin-top: 1rem; width: 100%;
+      padding: 10px; font-size: 14px; font-family: inherit;
+      background: #1a1a18; color: #fff; border: none;
+      border-radius: 8px; cursor: pointer;
+    }
+    #install-btn:hover { background: #333; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>タスクリスト</h1>
+    <div class="top-row">
+      <input type="text" id="task-input" placeholder="新しいタスクを入力..." />
+      <button id="add-btn" onclick="addTask()">追加</button>
+    </div>
+    <div id="task-list"></div>
+    <div id="stats"></div>
+    <button id="clear-btn" onclick="clearDone()">完了済みを削除</button>
+    <button id="install-btn">デスクトップにインストール</button>
+    <p id="note">タスクはブラウザに永続保存されます</p>
+  </div>
+
+  <script>
+    const KEY = "todo_v2";
+    let nextId = 1;
+    let openMemos = new Set();
+    let dragSrc = null;
+
+    function load() {
+      try {
+        const r = localStorage.getItem(KEY);
+        if (r) {
+          const d = JSON.parse(r);
+          nextId = d.nextId || 1;
+          return d.tasks || [];
+        }
+      } catch (e) {}
+      nextId = 4;
+      return [
+        { id: 1, text: "タスクを追加してみよう", done: false, memo: "" },
+        { id: 2, text: "ドラッグで並び替えできます", done: false, memo: "" },
+        { id: 3, text: "メモアイコンでメモを追加できます", done: false, memo: "" },
+      ];
+    }
+
+    function save() {
+      try { localStorage.setItem(KEY, JSON.stringify({ tasks, nextId })); } catch (e) {}
+    }
+
+    let tasks = load();
+
+    document.getElementById("task-input").addEventListener("keydown", e => {
+      if (e.key === "Enter") addTask();
+    });
+
+    function addTask() {
+      const v = document.getElementById("task-input").value.trim();
+      if (!v) return;
+      tasks.push({ id: nextId++, text: v, done: false, memo: "" });
+      document.getElementById("task-input").value = "";
+      save(); render();
+    }
+
+    function toggle(id) {
+      tasks = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
+      save(); render();
+    }
+
+    function remove(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      openMemos.delete(id);
+      save(); render();
+    }
+
+    function clearDone() {
+      tasks = tasks.filter(t => !t.done);
+      save(); render();
+    }
+
+    function toggleMemo(id) {
+      openMemos.has(id) ? openMemos.delete(id) : openMemos.add(id);
+      render();
+    }
+
+    function updateMemo(id, val) {
+      tasks = tasks.map(t => t.id === id ? { ...t, memo: val } : t);
+      save();
+    }
+
+    function render() {
+      const list = document.getElementById("task-list");
+      if (!tasks.length) {
+        list.innerHTML = '<div class="empty">タスクがありません</div>';
+      } else {
+        list.innerHTML = tasks.map(t => {
+          const hasMemo = t.memo && t.memo.trim();
+          const memoOpen = openMemos.has(t.id);
+          return `<div class="task-card${t.done ? ' done' : ''}" draggable="true" data-id="${t.id}">
+  <div class="card-main">
+    <span class="drag-handle" title="ドラッグで並び替え">⠿</span>
+    <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggle(${t.id})" />
+    <span class="task-label" onclick="toggle(${t.id})">${t.text}</span>
+    <button class="memo-toggle${hasMemo ? ' has-memo' : ''}" onclick="toggleMemo(${t.id})" title="メモ">${memoOpen ? '▲' : '📝'}</button>
+    <button class="del-btn" onclick="remove(${t.id})">✕</button>
+  </div>
+  ${memoOpen ? `<div class="memo-area"><textarea class="memo-input" placeholder="メモを入力..." oninput="updateMemo(${t.id},this.value)">${t.memo || ''}</textarea></div>` : ''}
+</div>`;
+        }).join("");
+
+        list.querySelectorAll(".task-card").forEach(el => {
+          el.addEventListener("dragstart", e => {
+            dragSrc = el;
+            el.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+          });
+          el.addEventListener("dragend", () => {
+            el.classList.remove("dragging");
+            list.querySelectorAll(".task-card").forEach(c => c.classList.remove("drag-over"));
+          });
+          el.addEventListener("dragover", e => {
+            e.preventDefault();
+            list.querySelectorAll(".task-card").forEach(c => c.classList.remove("drag-over"));
+            if (el !== dragSrc) el.classList.add("drag-over");
+          });
+          el.addEventListener("drop", e => {
+            e.preventDefault();
+            if (!dragSrc || dragSrc === el) return;
+            const fromId = parseInt(dragSrc.dataset.id);
+            const toId = parseInt(el.dataset.id);
+            const fi = tasks.findIndex(t => t.id === fromId);
+            const ti = tasks.findIndex(t => t.id === toId);
+            const [moved] = tasks.splice(fi, 1);
+            tasks.splice(ti, 0, moved);
+            save(); render();
+          });
+        });
+      }
+
+      const done = tasks.filter(t => t.done).length;
+      document.getElementById("stats").textContent =
+        tasks.length ? `${done} / ${tasks.length} 件完了` : "";
+    }
+
+    render();
+
+    // PWA インストールプロンプト
+    let deferredPrompt;
+    window.addEventListener("beforeinstallprompt", e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById("install-btn").style.display = "block";
+    });
+
+    document.getElementById("install-btn").addEventListener("click", async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome === "accepted") {
+        document.getElementById("install-btn").style.display = "none";
+      }
+    });
+
+    // Service Worker 登録
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js");
+    }
+  </script>
+</body>
+</html>
