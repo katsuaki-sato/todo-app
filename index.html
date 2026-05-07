@@ -4,27 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>タスクリスト</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#ffffff" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f3;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      padding: 2rem 1rem;
-      color: #1a1a18;
+      background: #f5f5f3; min-height: 100vh;
+      display: flex; justify-content: center;
+      padding: 2rem 1rem; color: #1a1a18;
     }
     #app {
-      background: #fff;
-      border-radius: 12px;
-      border: 0.5px solid #ddd;
-      padding: 2rem;
-      width: 100%;
-      max-width: 560px;
-      height: fit-content;
+      background: #fff; border-radius: 12px; border: 0.5px solid #ddd;
+      padding: 2rem; width: 100%; max-width: 560px; height: fit-content;
     }
     h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
     .top-bar { display: flex; gap: 8px; margin-bottom: 0.5rem; }
@@ -42,12 +32,48 @@
     .top-bar button:hover { background: #f0f0ee; }
     .edit-hint { font-size: 12px; color: #bbb; margin-bottom: 1.5rem; }
 
-    .project-card {
-      border: 0.5px solid #e0e0de;
-      border-radius: 12px;
-      margin-bottom: 12px;
-      overflow: hidden;
+    /* ラベル管理 */
+    #label-section { margin-bottom: 1.5rem; }
+    #label-toggle {
+      font-size: 13px; color: #888; background: none; border: none;
+      cursor: pointer; padding: 0; font-family: inherit; margin-bottom: 0.75rem;
+    }
+    #label-toggle:hover { color: #333; }
+    #label-manager { display: none; }
+    #label-manager.open { display: block; }
+    .label-add-row { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
+    .label-add-row input[type="text"] {
+      flex: 1; font-size: 13px; padding: 6px 10px;
+      border: 0.5px solid #ccc; border-radius: 8px;
+      outline: none; font-family: inherit;
+    }
+    .label-add-row input[type="text"]:focus { border-color: #888; }
+    .label-add-row input[type="color"] {
+      width: 36px; height: 32px; border: 0.5px solid #ccc;
+      border-radius: 8px; cursor: pointer; padding: 2px;
       background: #fff;
+    }
+    .label-add-row button {
+      font-size: 13px; padding: 6px 12px;
+      border: 0.5px solid #ccc; border-radius: 8px;
+      background: #fff; cursor: pointer; font-family: inherit;
+    }
+    .label-add-row button:hover { background: #f0f0ee; }
+    .label-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .label-chip-manage {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; padding: 3px 8px 3px 10px;
+      border-radius: 20px; cursor: default;
+    }
+    .label-chip-manage .del-lbl {
+      font-size: 11px; background: none; border: none;
+      cursor: pointer; opacity: 0.6; padding: 0 2px; line-height: 1;
+    }
+    .label-chip-manage .del-lbl:hover { opacity: 1; }
+
+    .project-card {
+      border: 0.5px solid #e0e0de; border-radius: 12px;
+      margin-bottom: 12px; overflow: hidden; background: #fff;
     }
     .project-header {
       display: flex; align-items: center; gap: 8px;
@@ -95,14 +121,13 @@
     .task-add-row button:hover { background: #f0f0ee; }
 
     .task-card {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 10px;
       border: 0.5px solid #e0e0de; border-radius: 8px;
       margin-bottom: 6px; background: #fff;
       transition: opacity .15s, box-shadow .15s;
     }
     .task-card.dragging { opacity: .4; }
     .task-card.drag-over { box-shadow: 0 -2px 0 #888; }
+    .task-main { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
     .task-card.done .task-label { text-decoration: line-through; color: #aaa; }
     .drag-handle { color: #bbb; font-size: 14px; cursor: grab; user-select: none; flex-shrink: 0; }
     .drag-handle:active { cursor: grabbing; }
@@ -112,38 +137,60 @@
       padding: 1px 4px; border-radius: 4px; min-width: 0;
     }
     .task-label:hover { background: #f0f0ee; }
-    .memo-btn {
+    .icon-btn {
       font-size: 13px; color: #bbb; background: none; border: none;
       cursor: pointer; padding: 2px 4px; border-radius: 4px; flex-shrink: 0;
     }
-    .memo-btn:hover { background: #f0f0ee; }
-    .memo-btn.has-memo { color: #666; }
-    .task-del {
-      font-size: 12px; color: #bbb; background: none; border: none;
-      cursor: pointer; padding: 2px 4px; border-radius: 4px;
-      font-family: inherit; flex-shrink: 0;
-    }
-    .task-del:hover { background: #fdecea; color: #c0392b; }
+    .icon-btn:hover { background: #f0f0ee; }
+    .icon-btn.active { color: #555; }
+    .icon-btn.del:hover { background: #fdecea; color: #c0392b; }
 
-    .memo-row { padding: 0 10px 8px 38px; }
+    /* バッジ行（ラベル＋日付） */
+    .badge-row { padding: 0 10px 6px 36px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .label-chip {
+      display: inline-flex; align-items: center;
+      font-size: 11px; padding: 2px 6px;
+      border-radius: 4px; font-weight: 500; flex-shrink: 0;
+    }
+    .dt-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 11px; color: #888;
+      padding: 2px 7px; background: #f5f5f3; border-radius: 20px;
+    }
+    .dt-badge.overdue { color: #c0392b; background: #fdecea; }
+
+    /* 詳細エリア */
+    .task-detail { padding: 0 10px 10px 36px; display: flex; flex-direction: column; gap: 8px; }
+    .datetime-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .dt-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 150px; }
+    .dt-label { font-size: 11px; color: #888; }
+    .dt-input {
+      font-size: 12px; padding: 5px 8px;
+      border: 0.5px solid #e0e0de; border-radius: 8px;
+      background: #f8f8f6; color: #1a1a18;
+      font-family: inherit; outline: none; width: 100%;
+    }
+    .dt-input:focus { border-color: #aaa; }
+    .label-select-row { display: flex; flex-direction: column; gap: 3px; }
+    .label-select-row .dt-label { font-size: 11px; color: #888; }
+    .label-select {
+      font-size: 12px; padding: 5px 8px;
+      border: 0.5px solid #e0e0de; border-radius: 8px;
+      background: #f8f8f6; color: #1a1a18;
+      font-family: inherit; outline: none; width: 100%; cursor: pointer;
+    }
+    .label-select:focus { border-color: #aaa; }
     .memo-input {
       width: 100%; font-size: 12px; color: #555;
       background: #f8f8f6; border: 0.5px solid #e0e0de;
       border-radius: 8px; padding: 5px 8px;
-      resize: none; font-family: inherit; line-height: 1.5; min-height: 48px;
+      resize: none; font-family: inherit; line-height: 1.5; min-height: 44px;
     }
     .memo-input:focus { outline: none; border-color: #aaa; }
 
     .empty-tasks { font-size: 13px; color: #aaa; padding: 4px 0 6px; text-align: center; }
     .no-projects { text-align: center; padding: 2rem 0; font-size: 14px; color: #aaa; }
     #note { font-size: 12px; color: #bbb; margin-top: 1.5rem; }
-    #install-btn {
-      display: none; margin-top: 1rem; width: 100%;
-      padding: 10px; font-size: 14px; font-family: inherit;
-      background: #1a1a18; color: #fff; border: none;
-      border-radius: 8px; cursor: pointer;
-    }
-    #install-btn:hover { background: #333; }
   </style>
 </head>
 <body>
@@ -153,110 +200,180 @@
       <input type="text" id="proj-input" placeholder="新しいプロジェクト名を入力..." />
       <button onclick="addProject()">追加</button>
     </div>
-    <p class="edit-hint">プロジェクト名・タスク名はクリックして編集できます</p>
+    <p class="edit-hint">プロジェクト名・タスク名はクリックして編集 ／ 📅 で日付・ラベル・メモを設定</p>
+
+    <div id="label-section">
+      <button id="label-toggle" onclick="toggleLabelManager()">🏷 ラベルを管理</button>
+      <div id="label-manager">
+        <div class="label-add-row">
+          <input type="text" id="label-input" placeholder="ラベル名..." />
+          <input type="color" id="label-color" value="#4f86f7" />
+          <button onclick="addLabel()">追加</button>
+        </div>
+        <div class="label-list" id="label-list"></div>
+      </div>
+    </div>
+
     <div id="proj-list"></div>
-    <button id="install-btn">デスクトップにインストール</button>
-    <p id="note">タスクはブラウザに永続保存されます</p>
+    <p id="note">タスクはブラウザに永続保存されます（タブを閉じても残ります）</p>
   </div>
 
   <script>
     const KEY = "todo_projects_v1";
     let data = load();
     let openProjects = new Set();
-    let openMemos = new Set();
+    let openDetails = new Set();
     let dragSrc = null, dragProjId = null;
     let editingProjId = null, editingTaskId = null;
+    let labelManagerOpen = false;
 
     function load() {
-      try { const r = localStorage.getItem(KEY); if (r) return JSON.parse(r); } catch (e) {}
-      return { nextProjId: 3, nextTaskId: 5, projects: [
-        { id: 1, name: "仕事", tasks: [
-          { id: 1, text: "企画書を作成する", done: false, memo: "" },
-          { id: 2, text: "ミーティングの議事録まとめ", done: true, memo: "" },
-        ]},
-        { id: 2, name: "プライベート", tasks: [
-          { id: 3, text: "読書：ゼロ・トゥ・ワン", done: false, memo: "" },
-          { id: 4, text: "ジムの予約", done: false, memo: "" },
-        ]},
-      ]};
+      try {
+        const r = localStorage.getItem(KEY);
+        if (r) {
+          const d = JSON.parse(r);
+          // 古いデータにlabels/nextLabelIdがない場合の補完
+          if (!d.labels) d.labels = [];
+          if (!d.nextLabelId) d.nextLabelId = 1;
+          // 各タスクにlabelIdがない場合の補完
+          d.projects.forEach(p => p.tasks.forEach(t => {
+            if (t.labelId === undefined) t.labelId = null;
+          }));
+          return d;
+        }
+      } catch (e) {}
+      return {
+        nextProjId: 3, nextTaskId: 5, nextLabelId: 4,
+        labels: [
+          { id: 1, name: "重要", color: "#e74c3c" },
+          { id: 2, name: "確認待ち", color: "#f39c12" },
+          { id: 3, name: "進行中", color: "#27ae60" },
+        ],
+        projects: [
+          { id: 1, name: "仕事", tasks: [
+            { id: 1, text: "企画書を作成する", done: false, memo: "", startAt: "", endAt: "", labelId: null },
+            { id: 2, text: "ミーティングの議事録まとめ", done: true, memo: "", startAt: "", endAt: "", labelId: null },
+          ]},
+          { id: 2, name: "プライベート", tasks: [
+            { id: 3, text: "読書：ゼロ・トゥ・ワン", done: false, memo: "", startAt: "", endAt: "", labelId: null },
+            { id: 4, text: "ジムの予約", done: false, memo: "", startAt: "", endAt: "", labelId: null },
+          ]},
+        ]
+      };
     }
     function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }
 
+    function fmt(dt) {
+      if (!dt) return "";
+      const [y, m, d] = dt.split("-");
+      return `${y}/${m}/${d}`;
+    }
+    function isOverdue(endAt) {
+      if (!endAt) return false;
+      const today = new Date(); today.setHours(0,0,0,0);
+      return new Date(endAt) < today;
+    }
+    function getLabel(id) { return data.labels.find(l => l.id === id) || null; }
+    function textColor(hex) {
+      const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+      return (r*299 + g*587 + b*114) / 1000 > 128 ? "#333" : "#fff";
+    }
+
     document.getElementById("proj-input").addEventListener("keydown", e => { if (e.key === "Enter") addProject(); });
+    document.getElementById("label-input").addEventListener("keydown", e => { if (e.key === "Enter") addLabel(); });
+
+    function toggleLabelManager() {
+      labelManagerOpen = !labelManagerOpen;
+      document.getElementById("label-manager").classList.toggle("open", labelManagerOpen);
+      renderLabels();
+    }
+
+    function addLabel() {
+      const name = document.getElementById("label-input").value.trim();
+      const color = document.getElementById("label-color").value;
+      if (!name) return;
+      data.labels.push({ id: data.nextLabelId++, name, color });
+      document.getElementById("label-input").value = "";
+      save(); renderLabels(); render();
+    }
+
+    function deleteLabel(lid) {
+      data.labels = data.labels.filter(l => l.id !== lid);
+      data.projects.forEach(p => p.tasks.forEach(t => { if (t.labelId === lid) t.labelId = null; }));
+      save(); renderLabels(); render();
+    }
+
+    function renderLabels() {
+      const list = document.getElementById("label-list");
+      if (!data.labels.length) { list.innerHTML = '<span style="font-size:12px;color:#bbb">ラベルがありません</span>'; return; }
+      list.innerHTML = data.labels.map(l => {
+        const tc = textColor(l.color);
+        return `<span class="label-chip-manage" style="background:${l.color};color:${tc}">
+  ${l.name}
+  <button class="del-lbl" style="color:${tc}" onclick="deleteLabel(${l.id})">✕</button>
+</span>`;
+      }).join("");
+    }
 
     function addProject() {
-      const v = document.getElementById("proj-input").value.trim();
-      if (!v) return;
+      const v = document.getElementById("proj-input").value.trim(); if (!v) return;
       const id = data.nextProjId++;
       data.projects.push({ id, name: v, tasks: [] });
       openProjects.add(id);
       document.getElementById("proj-input").value = "";
       save(); render();
     }
-
     function deleteProject(pid) {
       if (!confirm("プロジェクトを削除しますか？（タスクもすべて削除されます）")) return;
       data.projects = data.projects.filter(p => p.id !== pid);
-      openProjects.delete(pid);
-      save(); render();
+      openProjects.delete(pid); save(); render();
     }
-
-    function toggleProject(pid) {
-      openProjects.has(pid) ? openProjects.delete(pid) : openProjects.add(pid);
-      render();
-    }
-
+    function toggleProject(pid) { openProjects.has(pid) ? openProjects.delete(pid) : openProjects.add(pid); render(); }
     function startEditProj(pid) {
       editingProjId = pid; editingTaskId = null; render();
-      setTimeout(() => { const el = document.getElementById("edit-proj-" + pid); if (el) { el.focus(); el.select(); } }, 0);
+      setTimeout(() => { const el = document.getElementById("ep-"+pid); if (el) { el.focus(); el.select(); } }, 0);
     }
-
     function finishEditProj(pid, val) {
       const v = val.trim();
       if (v) data.projects = data.projects.map(p => p.id === pid ? { ...p, name: v } : p);
       editingProjId = null; save(); render();
     }
-
     function startEditTask(tid) {
       editingTaskId = tid; editingProjId = null; render();
-      setTimeout(() => { const el = document.getElementById("edit-task-" + tid); if (el) { el.focus(); el.select(); } }, 0);
+      setTimeout(() => { const el = document.getElementById("et-"+tid); if (el) { el.focus(); el.select(); } }, 0);
     }
-
     function finishEditTask(pid, tid, val) {
       const v = val.trim();
       if (v) { const p = data.projects.find(p => p.id === pid); p.tasks = p.tasks.map(t => t.id === tid ? { ...t, text: v } : t); }
       editingTaskId = null; save(); render();
     }
-
     function addTask(pid) {
-      const inp = document.getElementById("task-input-" + pid);
+      const inp = document.getElementById("ti-"+pid);
       const v = inp.value.trim(); if (!v) return;
       const p = data.projects.find(p => p.id === pid);
-      p.tasks.push({ id: data.nextTaskId++, text: v, done: false, memo: "" });
+      p.tasks.push({ id: data.nextTaskId++, text: v, done: false, memo: "", startAt: "", endAt: "", labelId: null });
       inp.value = ""; save(); render();
     }
-
     function toggleTask(pid, tid) {
       const p = data.projects.find(p => p.id === pid);
       p.tasks = p.tasks.map(t => t.id === tid ? { ...t, done: !t.done } : t);
       save(); render();
     }
-
     function deleteTask(pid, tid) {
       const p = data.projects.find(p => p.id === pid);
       p.tasks = p.tasks.filter(t => t.id !== tid);
-      openMemos.delete(tid); save(); render();
+      openDetails.delete(tid); save(); render();
     }
-
-    function toggleMemo(tid) { openMemos.has(tid) ? openMemos.delete(tid) : openMemos.add(tid); render(); }
-
-    function updateMemo(pid, tid, val) {
+    function toggleDetail(tid) { openDetails.has(tid) ? openDetails.delete(tid) : openDetails.add(tid); render(); }
+    function updateField(pid, tid, field, val) {
       const p = data.projects.find(p => p.id === pid);
-      p.tasks = p.tasks.map(t => t.id === tid ? { ...t, memo: val } : t);
-      save();
+      const parsed = (field === "labelId") ? (val ? parseInt(val) : null) : val;
+      p.tasks = p.tasks.map(t => t.id === tid ? { ...t, [field]: parsed } : t);
+      save(); render();
     }
 
     function render() {
+      renderLabels();
       const list = document.getElementById("proj-list");
       if (!data.projects.length) { list.innerHTML = '<div class="no-projects">プロジェクトがありません</div>'; return; }
 
@@ -267,41 +384,79 @@
         const meta = total ? `${done}/${total}件完了` : "タスクなし";
 
         const nameEl = editingProjId === p.id
-          ? `<input class="inline-edit" id="edit-proj-${p.id}" value="${p.name.replace(/"/g, '&quot;')}"
+          ? `<input class="inline-edit" id="ep-${p.id}" value="${p.name.replace(/"/g,'&quot;')}"
               onblur="finishEditProj(${p.id},this.value)"
               onkeydown="if(event.key==='Enter'||event.key==='Escape')this.blur()"
               onclick="event.stopPropagation()"/>`
-          : `<span class="project-name" onclick="event.stopPropagation();startEditProj(${p.id})" title="クリックして編集">${p.name}</span>`;
+          : `<span class="project-name" onclick="event.stopPropagation();startEditProj(${p.id})">${p.name}</span>`;
 
         const tasksHtml = p.tasks.map(t => {
+          const detailOpen = openDetails.has(t.id);
+          const hasDate = t.startAt || t.endAt;
           const hasMemo = t.memo && t.memo.trim();
-          const memoOpen = openMemos.has(t.id);
+          const lbl = getLabel(t.labelId);
+          const hasDetail = hasDate || hasMemo || lbl;
+          const overdue = !t.done && isOverdue(t.endAt);
+
+          const lblHtml = lbl ? (() => { const tc = textColor(lbl.color); return `<span class="label-chip" style="background:${lbl.color};color:${tc}">${lbl.name}</span>`; })() : '';
+
           const labelEl = editingTaskId === t.id
-            ? `<input class="inline-edit task-edit" id="edit-task-${t.id}" value="${t.text.replace(/"/g, '&quot;')}"
+            ? `<input class="inline-edit task-edit" id="et-${t.id}" value="${t.text.replace(/"/g,'&quot;')}"
                 onblur="finishEditTask(${p.id},${t.id},this.value)"
                 onkeydown="if(event.key==='Enter'||event.key==='Escape')this.blur()"/>`
-            : `<span class="task-label${t.done ? ' done' : ''}" onclick="startEditTask(${t.id})" title="クリックして編集">${t.text}</span>`;
+            : `${lblHtml}<span class="task-label${t.done?' done':''}" onclick="startEditTask(${t.id})">${t.text}</span>`;
 
-          return `<div class="task-card${t.done ? ' done' : ''}" draggable="true" data-tid="${t.id}" data-pid="${p.id}">
-  <span class="drag-handle">⠿</span>
-  <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask(${p.id},${t.id})" />
-  ${labelEl}
-  <button class="memo-btn${hasMemo ? ' has-memo' : ''}" onclick="toggleMemo(${t.id})">${memoOpen ? '▲' : '📝'}</button>
-  <button class="task-del" onclick="deleteTask(${p.id},${t.id})">✕</button>
-</div>
-${memoOpen ? `<div class="memo-row"><textarea class="memo-input" placeholder="メモ..." oninput="updateMemo(${p.id},${t.id},this.value)">${t.memo || ''}</textarea></div>` : ''}`;
+          const badges = [];
+          if (t.startAt) badges.push(`<span class="dt-badge">▶ ${fmt(t.startAt)}</span>`);
+          if (t.endAt) badges.push(`<span class="dt-badge${overdue?' overdue':''}">⏹ ${fmt(t.endAt)}${overdue?' ⚠':''}</span>`);
+
+          const labelOptions = `<option value="">なし</option>` +
+            data.labels.map(l => `<option value="${l.id}"${t.labelId===l.id?' selected':''}>${l.name}</option>`).join("");
+
+          return `<div class="task-card${t.done?' done':''}" draggable="true" data-tid="${t.id}" data-pid="${p.id}">
+  <div class="task-main">
+    <span class="drag-handle">⠿</span>
+    <input type="checkbox" ${t.done?'checked':''} onchange="toggleTask(${p.id},${t.id})"/>
+    ${labelEl}
+    <button class="icon-btn${hasDetail?' active':''}" onclick="toggleDetail(${t.id})" title="日付・ラベル・メモ">📅</button>
+    <button class="icon-btn del" onclick="deleteTask(${p.id},${t.id})">✕</button>
+  </div>
+  ${badges.length ? `<div class="badge-row">${badges.join("")}</div>` : ''}
+  ${detailOpen ? `<div class="task-detail">
+    <div class="label-select-row">
+      <span class="dt-label">ラベル</span>
+      <select class="label-select" onchange="updateField(${p.id},${t.id},'labelId',this.value)">
+        ${labelOptions}
+      </select>
+    </div>
+    <div class="datetime-row">
+      <div class="dt-field">
+        <span class="dt-label">開始日</span>
+        <input type="date" class="dt-input" value="${t.startAt||''}"
+          onchange="updateField(${p.id},${t.id},'startAt',this.value)"/>
+      </div>
+      <div class="dt-field">
+        <span class="dt-label">終了日</span>
+        <input type="date" class="dt-input" value="${t.endAt||''}"
+          onchange="updateField(${p.id},${t.id},'endAt',this.value)"/>
+      </div>
+    </div>
+    <textarea class="memo-input" placeholder="メモ..."
+      oninput="updateField(${p.id},${t.id},'memo',this.value)">${t.memo||''}</textarea>
+  </div>` : ''}
+</div>`;
         }).join("");
 
         return `<div class="project-card" data-pid="${p.id}">
   <div class="project-header" onclick="toggleProject(${p.id})">
-    <span class="chevron${isOpen ? ' open' : ''}">▶</span>
+    <span class="chevron${isOpen?' open':''}">▶</span>
     ${nameEl}
     <span class="project-meta">${meta}</span>
     <button class="project-del" onclick="event.stopPropagation();deleteProject(${p.id})">削除</button>
   </div>
   ${isOpen ? `<div class="task-area">
     <div class="task-add-row">
-      <input type="text" id="task-input-${p.id}" placeholder="タスクを追加..." onkeydown="if(event.key==='Enter')addTask(${p.id})" />
+      <input type="text" id="ti-${p.id}" placeholder="タスクを追加..." onkeydown="if(event.key==='Enter')addTask(${p.id})"/>
       <button onclick="addTask(${p.id})">追加</button>
     </div>
     ${p.tasks.length ? tasksHtml : '<div class="empty-tasks">タスクがありません</div>'}
@@ -327,24 +482,6 @@ ${memoOpen ? `<div class="memo-row"><textarea class="memo-input" placeholder="�
     }
 
     render();
-
-    let deferredPrompt;
-    window.addEventListener("beforeinstallprompt", e => {
-      e.preventDefault();
-      deferredPrompt = e;
-      document.getElementById("install-btn").style.display = "block";
-    });
-    document.getElementById("install-btn").addEventListener("click", async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      if (outcome === "accepted") document.getElementById("install-btn").style.display = "none";
-    });
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/todo-app/sw.js");
-    }
   </script>
 </body>
 </html>
