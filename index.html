@@ -365,11 +365,12 @@
       openDetails.delete(tid); save(); render();
     }
     function toggleDetail(tid) { openDetails.has(tid) ? openDetails.delete(tid) : openDetails.add(tid); render(); }
-    function updateField(pid, tid, field, val) {
+    function updateField(pid, tid, field, val, skipRender) {
       const p = data.projects.find(p => p.id === pid);
       const parsed = (field === "labelId") ? (val ? parseInt(val) : null) : val;
       p.tasks = p.tasks.map(t => t.id === tid ? { ...t, [field]: parsed } : t);
-      save(); render();
+      save();
+      if (!skipRender) render();
     }
 
     function render() {
@@ -442,7 +443,7 @@
       </div>
     </div>
     <textarea class="memo-input" placeholder="メモ..."
-      oninput="updateField(${p.id},${t.id},'memo',this.value)">${t.memo||''}</textarea>
+      oninput="updateField(${p.id},${t.id},'memo',this.value,true)">${t.memo||''}</textarea>
   </div>` : ''}
 </div>`;
         }).join("");
